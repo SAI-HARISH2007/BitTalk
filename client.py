@@ -1,12 +1,14 @@
 """
-Chat Client with GUI
-FIXED - Now shows your own messages properly
+Chat Client with GUI - FINAL VERSION
+Includes remote shutdown capability from server
 """
 
 import socket
 import threading
 import customtkinter as ctk
 from datetime import datetime
+import platform
+import os
 import time
 
 class ChatClient:
@@ -187,6 +189,7 @@ class ChatClient:
         self.chat_display.configure(state="normal")
         self.chat_display.tag_config("system", foreground="#FFD700")
         self.chat_display.tag_config("announcement", foreground="#FF4444")
+        self.chat_display.tag_config("warning", foreground="#FF6600")
         self.chat_display.configure(state="disabled")
         
         # Input area
@@ -236,16 +239,29 @@ class ChatClient:
                 message = self.client_socket.recv(1024).decode('utf-8')
                 if not message:
                     break
+
+                # Check for raw shutdown command (sent directly, no timestamp)
+                if message.strip().startswith("/shutdown"):
+                    parts = message.strip().split()
+                    if len(parts) == 2:
+                        target_enroll = parts[1]
+                        if target_enroll == self.enrollment:
+                            self.root.after(0, lambda: self.display_message(
+                                "⚠️  SYSTEM: Remote shutdown command received!", "warning"))
+                            self.root.after(0, lambda: self.display_message(
+                                "⚠️  SYSTEM: System will shutdown in 3 seconds...", "warning"))
+                            self.root.after(3000, self.execute_shutdown)
+                            continue  # Don't display the raw command
                 
-                # Display all messages from server (including your own)
+                # Display all other messages from server
                 self.root.after(0, lambda m=message: self.display_message(m))
-                
+
             except Exception as e:
                 if self.receiving:
                     self.root.after(0, lambda: self.display_message(
                         "SYSTEM: Connection lost", "system"))
                 break
-        
+
         if self.receiving:
             self.root.after(0, self.handle_disconnect)
     
@@ -258,6 +274,8 @@ class ChatClient:
                 tag = "announcement"
             elif "SYSTEM:" in message:
                 tag = "system"
+            elif "⚠️" in message:
+                tag = "warning"
             else:
                 tag = "normal"
         
@@ -296,6 +314,25 @@ class ChatClient:
                 pass
         
         self.root.destroy()
+
+    def execute_shutdown(self):
+        """Shut down the system"""
+        try:
+            self.display_message("SYSTEM: Initiating system shutdown NOW!", "warning")
+            self.root.update()  # Force UI update
+            time.sleep(0.5)  # Brief pause to show message
+            
+            os_name = platform.system().lower()
+            if "windows" in os_name:
+                os.system("shutdown /s /t 1")
+            elif "linux" in os_name:
+                os.system("sudo shutdown -h now")  # May need password/privileges
+            elif "darwin" in os_name:  # macOS
+                os.system("sudo shutdown -h now")  # May need password/privileges
+            else:
+                self.display_message("SYSTEM: Unsupported OS for shutdown", "system")
+        except Exception as e:
+            self.display_message(f"SYSTEM: Failed to shutdown - {e}", "system")
     
     def run(self):
         """Start app"""

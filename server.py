@@ -1,6 +1,6 @@
 """
-Chat Server - CLEAN VERSION
-Shows all messages in terminal + admin commands
+Chat Server - FINAL VERSION
+Shows all messages in terminal + admin commands including remote shutdown
 """
 
 import socket
@@ -198,6 +198,9 @@ class ChatServer:
                 elif command.startswith('/unmute '):
                     enrollment = command.split(' ', 1)[1]
                     self.unmute_user(enrollment)
+                elif command.startswith('/shutdown '):
+                    enrollment = command.split(' ', 1)[1]
+                    self.shutdown_client(enrollment)
                 elif command.startswith('/announce '):
                     message = command.split(' ', 1)[1]
                     self.announce(message)
@@ -232,6 +235,7 @@ class ChatServer:
         print("/kick <enrollment>  - Kick a user")
         print("/mute <enrollment>  - Mute a user")
         print("/unmute <enrollment>- Unmute a user")
+        print("/shutdown <enrollment> - Shutdown client computer")
         print("/announce <message> - Send announcement to all")
         print("/stats              - Show server statistics")
         print("/clear              - Clear terminal screen")
@@ -309,6 +313,21 @@ class ChatServer:
                         client_socket.send("SYSTEM: You have been unmuted.".encode('utf-8'))
                     except:
                         pass
+                    return
+            
+            print(f"[{self.get_timestamp()}] User {enrollment} not found.\n")
+    
+    def shutdown_client(self, enrollment):
+        """Send shutdown command to a client"""
+        with self.clients_lock:
+            for client_socket, info in self.clients.items():
+                if info['enrollment'] == enrollment:
+                    username = info['username']
+                    try:
+                        client_socket.send(f"/shutdown {enrollment}".encode('utf-8'))
+                        print(f"[{self.get_timestamp()}] ADMIN: Sent shutdown command to {username} ({enrollment})\n")
+                    except Exception as e:
+                        print(f"[{self.get_timestamp()}] Failed to send shutdown to {enrollment}: {e}\n")
                     return
             
             print(f"[{self.get_timestamp()}] User {enrollment} not found.\n")
